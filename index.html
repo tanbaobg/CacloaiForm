@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Làm bài tập</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    label, select, input, button { display: block; margin-top: 10px; width: 100%; }
+    iframe { width: 100%; height: 400px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>Đăng nhập</h2>
+<label for="nguoiLamSelect">Người làm:</label>
+<select id="nguoiLamSelect"></select>
+
+<label for="maDinhDanhInput">Mã định danh:</label>
+<input type="text" id="maDinhDanhInput">
+
+<button onclick="dangNhap()">Đăng nhập</button>
+<p id="loginError" style="color: red;"></p>
+
+<hr>
+
+<div id="lamBai" style="display:none;">
+  <h2>Làm bài</h2>
+
+  <label for="maDeSelect">Mã đề:</label>
+  <select id="maDeSelect" onchange="loadMaCauHoi()"></select>
+
+  <label for="maCauHoiSelect">Mã câu hỏi:</label>
+  <select id="maCauHoiSelect" onchange="loadLink()"></select>
+
+  <label for="dapAnInput">Đáp án:</label>
+  <input type="text" id="dapAnInput" maxlength="4">
+
+  <button onclick="nopBai()">Nộp đáp án</button>
+
+  <p id="submitSuccess" style="color: green;"></p>
+
+  <iframe id="iframeLink"></iframe>
+</div>
+
+<script>
+const apiBase = 'https://script.google.com/macros/s/AKfycbxyz1234567890/exec'; // <--- Đổi link Apps Script của bạn vào đây
+
+let currentNguoiLam = '';
+let currentDiaChi = '';
+
+function loadNguoiLam() {
+  fetch(apiBase + '?action=getNguoiLam')
+    .then(res => res.json())
+    .then(data => {
+      const select = document.getElementById('nguoiLamSelect');
+      data.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.nguoiLam;
+        option.textContent = item.nguoiLam;
+        option.dataset.maDinhDanh = item.maDinhDanh;
+        option.dataset.diaChi = item.diaChi;
+        select.appendChild(option);
+      });
+    });
+}
+
+function dangNhap() {
+  const nguoiLam = document.getElementById('nguoiLamSelect').value;
+  const maDinhDanh = document.getElementById('maDinhDanhInput').value.trim();
+
+  fetch(apiBase + '?action=checkMaDinhDanh&nguoiLam=' + encodeURIComponent(nguoiLam) + '&maDinhDanh=' + encodeURIComponent(maDinhDanh))
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        currentNguoiLam = nguoiLam;
+        currentDiaChi = result.diaChi;
+        document.getElementById('lamBai').style.display = 'block';
+        loadMaDe();
+      } else {
+        document.getElementById('loginError').textContent = 'Sai mã định danh!';
+      }
+    });
+}
+
+function loadMaDe() {
+  fetch(apiBase + '?action=getMaDe')
+    .then(res => res.json())
+    .then(data => {
+      const select = document.getElementById('maDeSelect');
+      select.innerHTML = '';
+      data.forEach(maDe => {
+        const option = document.createElement('option');
+        option.value = maDe;
+        option.textContent = maDe;
+        select.appendChild(option);
+      });
+      loadMaCauHoi();
+    });
+}
+
+function loadMaCauHoi() {
+  const maDe = document.getElementById('maDeSelect').value;
+  fetch(apiBase + '?action=getMaCauHoi&maDe=' + encodeURIComponent(maDe))
+    .then(res => res.json())
+    .then(data => {
+      const select = document.getElementById('maCauHoiSelect');
+      select.innerHTML = '';
+      data.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.maCauHoi;
+        option.textContent = item.maCauHoi;
+        option.dataset.link = item.link || '';
+        select.appendChild(option);
+      });
+      loadLink();
+    });
+}
+
+function loadLink() {
+  const selected = document.getElementById('maCauHoiSelect').selectedOptions[0];
+  const link = selected?.dataset.link || '';
+  if (link) {
+    const previewLink = link.replace('/view', '/preview');
+    document.getElementById('iframeLink').src = previewLink;
+  }
+}
+
+function nopBai() {
+  const data = {
+    nguoiLam: currentNguoiLam,
+    diaChi: currentDiaChi,
+    maDe: document.getElementById('maDeSelect').value,
+    maCauHoi: document.getElementById('maCauHoiSelect').value,
+    dapAn: document.getElementById('dapAnInput').value.trim(),
+    ghiChu: ''
+  };
+
+  fetch(apiBase + '?action=submitAnswer', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+  .then(() => {
+    document.getElementById('submitSuccess').textContent = 'Nộp thành công!';
+    setTimeout(() => {
+      document.getElementById('submitSuccess').textContent = '';
+    }, 3000);
+  });
+}
+
+window.onload = loadNguoiLam;
+</script>
+
+</body>
+</html>
